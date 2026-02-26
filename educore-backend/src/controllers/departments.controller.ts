@@ -17,7 +17,7 @@ export async function list(_req: Request, res: Response, next: NextFunction): Pr
   try {
     const { data, error } = await supabaseAdmin
       .from('departments')
-      .select('*, users!departments_hod_id_fkey(name, email)')
+      .select('*, users!fk_departments_hod(name, email)')
       .order('name');
 
     if (error) throw new AppError(500, error.message);

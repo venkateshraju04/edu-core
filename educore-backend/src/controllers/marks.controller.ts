@@ -30,13 +30,10 @@ export async function create(req: Request, res: Response, next: NextFunction): P
   try {
     const body = createMarkSchema.parse(req.body);
 
-    // Upsert so teachers can re-enter marks
+    // Insert mark; update if already exists via a follow-up PUT
     const { data, error } = await supabaseAdmin
       .from('marks')
-      .upsert(
-        { ...body, entered_by: req.user!.userId },
-        { onConflict: 'student_id,class_id,subject,exam_type,assignment_no,academic_year' }
-      )
+      .insert({ ...body, entered_by: req.user!.userId })
       .select()
       .single();
 

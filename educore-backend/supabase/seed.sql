@@ -18,7 +18,7 @@ INSERT INTO departments (id, name) VALUES
   ('00000000-0000-0000-0000-000000000007', 'Physical Education');
 
 -- ─────────────────────────────────────────────
--- USERS  (password: "password123")
+-- USERS  (password: "password")
 -- bcrypt hash: $2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
 -- ─────────────────────────────────────────────
 
