@@ -16,7 +16,11 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       .eq('email', body.email)
       .single();
 
-    if (error || !user) {
+    if (error) {
+      throw new AppError(500, `Database error during login: ${error.message}`);
+    }
+
+    if (!user) {
       throw new AppError(401, 'Invalid email or password');
     }
 
@@ -89,7 +93,11 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
       .eq('id', req.user!.userId)
       .single();
 
-    if (error || !user) {
+    if (error) {
+      throw new AppError(500, `Database error fetching profile: ${error.message}`);
+    }
+
+    if (!user) {
       throw new AppError(404, 'User not found');
     }
 

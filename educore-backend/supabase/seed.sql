@@ -18,15 +18,15 @@ INSERT INTO departments (id, name) VALUES
   ('00000000-0000-0000-0000-000000000007', 'Physical Education');
 
 -- ─────────────────────────────────────────────
--- USERS  (password: "password")
--- bcrypt hash: $2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
+-- USERS  (password: "password123")
+-- bcrypt hash: $2a$10$scUFjUpVGlhE2IciHVVxH.r4wGMfYkT7tTY/zjiRgQJTv2jx6qpfS
 -- ─────────────────────────────────────────────
 
 INSERT INTO users (id, name, email, password_hash, role, department_id) VALUES
-  ('00000000-0000-0000-0001-000000000001', 'Alex Admin',        'admin@educore.school',     '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin',     NULL),
-  ('00000000-0000-0000-0001-000000000002', 'Patricia Principal','principal@educore.school', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'principal', NULL),
-  ('00000000-0000-0000-0001-000000000003', 'Howard HOD',        'hod@educore.school',       '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'hod',       '00000000-0000-0000-0000-000000000001'),
-  ('00000000-0000-0000-0001-000000000004', 'Tara Teacher',      'teacher@educore.school',   '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'teacher',   '00000000-0000-0000-0000-000000000001');
+  ('00000000-0000-0000-0001-000000000001', 'Alex Admin',        'admin@educore.school',     '$2a$10$scUFjUpVGlhE2IciHVVxH.r4wGMfYkT7tTY/zjiRgQJTv2jx6qpfS', 'admin',     NULL),
+  ('00000000-0000-0000-0001-000000000002', 'Patricia Principal','principal@educore.school', '$2a$10$scUFjUpVGlhE2IciHVVxH.r4wGMfYkT7tTY/zjiRgQJTv2jx6qpfS', 'principal', NULL),
+  ('00000000-0000-0000-0001-000000000003', 'Howard HOD',        'hod@educore.school',       '$2a$10$scUFjUpVGlhE2IciHVVxH.r4wGMfYkT7tTY/zjiRgQJTv2jx6qpfS', 'hod',       '00000000-0000-0000-0000-000000000001'),
+  ('00000000-0000-0000-0001-000000000004', 'Tara Teacher',      'teacher@educore.school',   '$2a$10$scUFjUpVGlhE2IciHVVxH.r4wGMfYkT7tTY/zjiRgQJTv2jx6qpfS', 'teacher',   '00000000-0000-0000-0000-000000000001');
 
 -- Assign HOD to Mathematics department
 UPDATE departments SET hod_id = '00000000-0000-0000-0001-000000000003'
