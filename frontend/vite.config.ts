@@ -55,7 +55,14 @@
       outDir: 'build',
     },
     server: {
-      port: 3000,
+      port: 5173,
+      strictPort: true,
       open: true,
+      proxy: {
+        '/api': {
+          target: 'http://127.0.0.1:3001',
+          changeOrigin: true,
+        },
+      },
     },
   });

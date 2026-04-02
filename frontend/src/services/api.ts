@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "principal" | "hod" | "teacher";
 
-const API_BASE_URL = (((import.meta as any).env?.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "")) || "http://localhost:3001/api";
+const API_BASE_URL = (((import.meta as any).env?.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "")) || "/api";
 const AUTH_TOKEN_KEY = "educore_auth_token";
 
 export interface ApiErrorPayload {
