@@ -201,3 +201,20 @@ tests/
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm start` | Run compiled production build |
 | `npm test` | Run full integration test suite |
+
+---
+
+## Login Credentials
+
+Use these seeded accounts for local development and testing. All four use the same password:
+
+`password123`
+
+| Email | Role |
+|---|---|
+| `admin@educore.school` | admin |
+| `principal@educore.school` | principal |
+| `hod@educore.school` | hod |
+| `teacher@educore.school` | teacher |
+
+
