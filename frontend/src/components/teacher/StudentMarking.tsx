@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '../Sidebar';
 import Header from '../Header';
-import { marksApi, studentsApi, type MarkRecord, type StudentRecord } from '../../services/api';
+import { getJwtClaims, marksApi, studentsApi, type MarkRecord, type StudentRecord } from '../../services/api';
 
 interface StudentUi {
   id: string;
@@ -25,6 +25,7 @@ function classLabel(student: StudentRecord): string {
 }
 
 export default function StudentMarking() {
+  const claims = getJwtClaims();
   const [students, setStudents] = useState<StudentUi[]>([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
@@ -34,14 +35,17 @@ export default function StudentMarking() {
 
   const loadStudents = async () => {
     try {
-      const response = await studentsApi.list('page=1&limit=500');
-      const rows = (response.data ?? []).map((student) => ({
-        id: student.id,
-        name: `${student.first_name} ${student.last_name}`,
-        rollNo: String(student.roll_number),
-        classId: student.class_id,
-        className: classLabel(student),
-      }));
+      const classIds = claims?.classIds || [];
+      const responses = await Promise.all(classIds.map((classId) => studentsApi.byClass(classId)));
+      const rows = responses
+        .flatMap((response) => response.data ?? [])
+        .map((student) => ({
+          id: student.id,
+          name: `${student.first_name} ${student.last_name}`,
+          rollNo: String(student.roll_number),
+          classId: student.class_id,
+          className: classLabel(student),
+        }));
 
       setStudents(rows);
       if (!selectedClass && rows.length > 0) {

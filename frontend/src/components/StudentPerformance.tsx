@@ -1,128 +1,140 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '../App';
+import {
+  attendanceApi,
+  marksApi,
+  studentsApi,
+  type AttendanceSummary,
+  type MarkRecord,
+  type StudentRecord,
+} from '../services/api';
 
-interface Student {
+interface StudentUi {
   id: string;
   name: string;
   rollNo: string;
-  class: string;
-  attendance: number;
-  grades: { subject: string; grade: string }[];
-  behavior: { event: string; date: string }[];
+  classId: string;
+  className: string;
 }
 
-const studentData: Student[] = [
-  {
-    id: 'S001',
-    name: 'Emma Thompson',
-    rollNo: '001',
-    class: 'Grade 10-A',
-    attendance: 92,
-    grades: [
-      { subject: 'Mathematics', grade: 'A' },
-      { subject: 'Physics', grade: 'A-' },
-      { subject: 'Chemistry', grade: 'B+' },
-      { subject: 'English', grade: 'A' }
-    ],
-    behavior: [
-      { event: 'Excellent class participation', date: 'Dec 5' },
-      { event: 'Won Science Fair', date: 'Nov 28' }
-    ]
-  },
-  {
-    id: 'S002',
-    name: 'James Wilson',
-    rollNo: '002',
-    class: 'Grade 10-A',
-    attendance: 85,
-    grades: [
-      { subject: 'Mathematics', grade: 'B' },
-      { subject: 'Physics', grade: 'B+' },
-      { subject: 'Chemistry', grade: 'B' },
-      { subject: 'English', grade: 'A-' }
-    ],
-    behavior: [
-      { event: 'Late to class', date: 'Dec 8' },
-      { event: 'Helped organize sports day', date: 'Nov 30' }
-    ]
-  },
-  {
-    id: 'S003',
-    name: 'Olivia Brown',
-    rollNo: '001',
-    class: 'Grade 11-A',
-    attendance: 88,
-    grades: [
-      { subject: 'Mathematics', grade: 'A+' },
-      { subject: 'Computer Science', grade: 'A' },
-      { subject: 'Physics', grade: 'A' },
-      { subject: 'English', grade: 'B+' }
-    ],
-    behavior: [
-      { event: 'Perfect homework submission', date: 'Dec 6' },
-      { event: 'Student council member', date: 'Nov 15' }
-    ]
-  },
-  {
-    id: 'S004',
-    name: 'Noah Davis',
-    rollNo: '002',
-    class: 'Grade 11-A',
-    attendance: 94,
-    grades: [
-      { subject: 'Mathematics', grade: 'A' },
-      { subject: 'Computer Science', grade: 'A+' },
-      { subject: 'Physics', grade: 'A-' },
-      { subject: 'English', grade: 'B+' }
-    ],
-    behavior: [
-      { event: 'Won coding competition', date: 'Dec 2' }
-    ]
-  },
-  {
-    id: 'S005',
-    name: 'Sophia Martinez',
-    rollNo: '001',
-    class: 'Grade 9-B',
-    attendance: 90,
-    grades: [
-      { subject: 'Mathematics', grade: 'B+' },
-      { subject: 'Science', grade: 'A' },
-      { subject: 'History', grade: 'A-' },
-      { subject: 'English', grade: 'A' }
-    ],
-    behavior: [
-      { event: 'Joined debate club', date: 'Nov 20' }
-    ]
-  }
-];
+function classLabel(student: StudentRecord): string {
+  if (student.classes?.name) return student.classes.name;
+  if (student.classes?.grade && student.classes?.section) return `Grade ${student.classes.grade}-${student.classes.section}`;
+  if (student.classes?.grade) return `Grade ${student.classes.grade}`;
+  return `Class ${student.class_id.slice(0, 8)}`;
+}
+
+function gradeFromPercent(percent: number): string {
+  if (percent >= 90) return 'A';
+  if (percent >= 80) return 'B';
+  if (percent >= 70) return 'C';
+  if (percent >= 60) return 'D';
+  return 'F';
+}
 
 export default function StudentPerformance() {
   const { role } = useAuth();
-  const classes = ['Grade 8-A', 'Grade 9-B', 'Grade 10-A', 'Grade 11-A', 'Grade 12-A'];
-  const [selectedClass, setSelectedClass] = useState('Grade 10-A');
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [students, setStudents] = useState<StudentUi[]>([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
+  const [marks, setMarks] = useState<MarkRecord[]>([]);
 
-  const studentsInClass = studentData.filter(s => s.class === selectedClass);
+  const loadStudents = async () => {
+    try {
+      setLoading(true);
+      const response = await studentsApi.list('page=1&limit=500');
+      const rows = (response.data ?? []).map((student) => ({
+        id: student.id,
+        name: `${student.first_name} ${student.last_name}`,
+        rollNo: String(student.roll_number),
+        classId: student.class_id,
+        className: classLabel(student),
+      }));
 
-  // Set default to first roll number when class changes
-  useState(() => {
-    if (studentsInClass.length > 0) {
-      setSelectedStudent(studentsInClass[0]);
-    }
-  });
-
-  const handleClassChange = (className: string) => {
-    setSelectedClass(className);
-    const students = studentData.filter(s => s.class === className);
-    if (students.length > 0) {
-      setSelectedStudent(students[0]);
-    } else {
-      setSelectedStudent(null);
+      setStudents(rows);
+      if (rows.length > 0) {
+        const initialClass = rows[0].className;
+        setSelectedClass(initialClass);
+        setSelectedStudentId(rows.find((student) => student.className === initialClass)?.id || null);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to load students');
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadStudents();
+  }, []);
+
+  const classes = useMemo(() => Array.from(new Set(students.map((student) => student.className))), [students]);
+  const studentsInClass = useMemo(() => students.filter((student) => student.className === selectedClass), [students, selectedClass]);
+  const selectedStudent = useMemo(
+    () => studentsInClass.find((student) => student.id === selectedStudentId) || studentsInClass[0] || null,
+    [studentsInClass, selectedStudentId],
+  );
+
+  useEffect(() => {
+    if (!selectedStudent && studentsInClass.length > 0) {
+      setSelectedStudentId(studentsInClass[0].id);
+    }
+  }, [selectedStudent, studentsInClass]);
+
+  const loadStudentDetails = async (studentId: string) => {
+    try {
+      const [attendanceResponse, marksResponse] = await Promise.all([
+        attendanceApi.studentSummary(studentId),
+        marksApi.byStudent(studentId),
+      ]);
+      setAttendanceSummary(attendanceResponse.data || null);
+      setMarks(marksResponse.data ?? []);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to load student details');
+      setAttendanceSummary(null);
+      setMarks([]);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedStudent?.id) {
+      loadStudentDetails(selectedStudent.id);
+    }
+  }, [selectedStudent?.id]);
+
+  const marksBySubject = useMemo(() => {
+    const grouped = new Map<string, MarkRecord[]>();
+    marks.forEach((row) => {
+      const key = row.subject;
+      const rows = grouped.get(key) || [];
+      rows.push(row);
+      grouped.set(key, rows);
+    });
+
+    return Array.from(grouped.entries()).map(([subject, rows]) => {
+      const average = rows.reduce((sum, row) => sum + Number(row.marks_obtained), 0) / rows.length;
+      const percent = Math.round(average);
+      return { subject, percent, grade: gradeFromPercent(percent) };
+    });
+  }, [marks]);
+
+  const behaviorTimeline = useMemo(() => {
+    const attendanceEvents = (attendanceSummary?.records || []).slice(0, 4).map((record) => ({
+      event: record.is_present ? 'Present in class' : 'Absent from class',
+      date: new Date(record.date).toLocaleDateString(),
+    }));
+
+    const markEvents = marks.slice(0, 4).map((mark) => ({
+      event: `${mark.subject} ${mark.exam_type}: ${mark.marks_obtained}/${mark.max_marks}`,
+      date: mark.academic_year,
+    }));
+
+    return [...markEvents, ...attendanceEvents].slice(0, 8);
+  }, [attendanceSummary?.records, marks]);
 
   const getAttendanceColor = (attendance: number) => {
     if (attendance >= 90) return 'bg-green-500';
@@ -133,10 +145,12 @@ export default function StudentPerformance() {
   const getGradeColor = (grade: string) => {
     if (grade.startsWith('A')) return 'bg-green-100 text-green-700 border-green-200';
     if (grade.startsWith('B')) return 'bg-blue-100 text-blue-700 border-blue-200';
+    if (grade.startsWith('C')) return 'bg-yellow-100 text-yellow-700 border-yellow-200';
     return 'bg-orange-100 text-orange-700 border-orange-200';
   };
 
   const isViewOnly = role === 'principal' || role === 'hod';
+  const attendancePercent = attendanceSummary?.percentage || 0;
 
   return (
     <div className="flex">
@@ -148,18 +162,20 @@ export default function StudentPerformance() {
             <div className="mb-8">
               <h1 className="text-slate-800 mb-2">Student Performance</h1>
               <p className="text-slate-600">
-                {isViewOnly ? 'View student academic records and behavior' : 'View detailed student academic records and behavior'}
+                {isViewOnly ? 'View student academic records and attendance' : 'View detailed student academic records'}
               </p>
             </div>
 
-            {/* Class Selection */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
               <label className="block text-slate-700 mb-3">Select Class</label>
               <div className="grid grid-cols-5 gap-3">
                 {classes.map((className) => (
                   <button
                     key={className}
-                    onClick={() => handleClassChange(className)}
+                    onClick={() => {
+                      setSelectedClass(className);
+                      setSelectedStudentId(students.find((student) => student.className === className)?.id || null);
+                    }}
                     className={`px-4 py-3 rounded-lg transition border ${
                       selectedClass === className
                         ? 'bg-blue-600 text-white border-blue-600'
@@ -173,16 +189,17 @@ export default function StudentPerformance() {
             </div>
 
             <div className="grid grid-cols-12 gap-6">
-              {/* Student List */}
               <div className="col-span-4">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                   <h2 className="text-slate-800 mb-4">Students in {selectedClass}</h2>
-                  {studentsInClass.length > 0 ? (
+                  {loading ? (
+                    <p className="text-slate-500 text-center py-8">Loading students...</p>
+                  ) : studentsInClass.length > 0 ? (
                     <div className="space-y-2">
                       {studentsInClass.map((student) => (
                         <button
                           key={student.id}
-                          onClick={() => setSelectedStudent(student)}
+                          onClick={() => setSelectedStudentId(student.id)}
                           className={`w-full text-left p-4 rounded-lg transition border ${
                             selectedStudent?.id === student.id
                               ? 'bg-blue-50 border-blue-300'
@@ -207,10 +224,8 @@ export default function StudentPerformance() {
                 </div>
               </div>
 
-              {/* Student Details */}
               {selectedStudent && (
                 <div className="col-span-8 space-y-6">
-                  {/* Student Info Header */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
@@ -218,64 +233,65 @@ export default function StudentPerformance() {
                       </div>
                       <div>
                         <h2 className="text-slate-800">{selectedStudent.name}</h2>
-                        <p className="text-slate-600">{selectedStudent.class} • Roll No: {selectedStudent.rollNo}</p>
+                        <p className="text-slate-600">{selectedStudent.className} • Roll No: {selectedStudent.rollNo}</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Attendance */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                     <h2 className="text-slate-800 mb-4">Attendance</h2>
                     <div className="flex items-center gap-4">
                       <div className="flex-1">
                         <div className="bg-slate-200 rounded-full h-4 overflow-hidden">
-                          <div
-                            className={`h-full ${getAttendanceColor(selectedStudent.attendance)} transition-all`}
-                            style={{ width: `${selectedStudent.attendance}%` }}
-                          ></div>
+                          <div className={`h-full ${getAttendanceColor(attendancePercent)} transition-all`} style={{ width: `${attendancePercent}%` }} />
                         </div>
                       </div>
-                      <div className="text-slate-800 min-w-[80px] text-right">
-                        {selectedStudent.attendance}% Present
-                      </div>
+                      <div className="text-slate-800 min-w-[100px] text-right">{attendancePercent}% Present</div>
                     </div>
+                    <p className="text-slate-500 text-sm mt-3">
+                      {attendanceSummary?.present || 0} present, {attendanceSummary?.absent || 0} absent out of {attendanceSummary?.total || 0} records
+                    </p>
                   </div>
 
-                  {/* Grades */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                     <h2 className="text-slate-800 mb-4">Grade Report</h2>
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedStudent.grades.map((item, index) => (
-                        <div
-                          key={index}
-                          className={`p-4 rounded-lg border ${getGradeColor(item.grade)}`}
-                        >
-                          <p className="text-sm mb-1">{item.subject}</p>
-                          <p className="text-2xl">{item.grade}</p>
-                        </div>
-                      ))}
-                    </div>
+                    {marksBySubject.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        {marksBySubject.map((item) => (
+                          <div key={item.subject} className={`p-4 rounded-lg border ${getGradeColor(item.grade)}`}>
+                            <p className="text-sm mb-1">{item.subject}</p>
+                            <p className="text-2xl">{item.grade}</p>
+                            <p className="text-xs mt-1">Avg: {item.percent}%</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-500">No marks available yet.</p>
+                    )}
                   </div>
 
-                  {/* Behavior Tracking */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <h2 className="text-slate-800 mb-4">Behavior Timeline</h2>
-                    <div className="space-y-4">
-                      {selectedStudent.behavior.map((event, index) => (
-                        <div key={index} className="flex gap-4">
-                          <div className="relative">
-                            <div className="w-3 h-3 bg-blue-500 rounded-full mt-1"></div>
-                            {index !== selectedStudent.behavior.length - 1 && (
-                              <div className="absolute left-1/2 top-3 w-0.5 h-full bg-slate-200 -translate-x-1/2"></div>
-                            )}
+                    <h2 className="text-slate-800 mb-4">Academic Timeline</h2>
+                    {behaviorTimeline.length > 0 ? (
+                      <div className="space-y-4">
+                        {behaviorTimeline.map((event, index) => (
+                          <div key={`${event.event}-${index}`} className="flex gap-4">
+                            <div className="relative">
+                              <div className="w-3 h-3 bg-blue-500 rounded-full mt-1" />
+                              {index !== behaviorTimeline.length - 1 && (
+                                <div className="absolute left-1/2 top-3 w-0.5 h-full bg-slate-200 -translate-x-1/2" />
+                              )}
+                            </div>
+                            <div className="flex-1 pb-4">
+                              <p className="text-slate-800">{event.event}</p>
+                              <p className="text-slate-500 text-sm mt-1">{event.date}</p>
+                            </div>
                           </div>
-                          <div className="flex-1 pb-4">
-                            <p className="text-slate-800">{event.event}</p>
-                            <p className="text-slate-500 text-sm mt-1">{event.date}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-500">No timeline events yet.</p>
+                    )}
                   </div>
                 </div>
               )}

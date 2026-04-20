@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import Sidebar from '../Sidebar';
 import Header from '../Header';
 import { Users } from 'lucide-react';
-import { departmentsApi, teachersApi, type DepartmentRecord } from '../../services/api';
+import { departmentsApi, teachersApi, type DepartmentRecord, type TeacherRecord } from '../../services/api';
 
 export default function DepartmentManagement() {
   const [departments, setDepartments] = useState<DepartmentRecord[]>([]);
   const [teacherCountByDept, setTeacherCountByDept] = useState<Record<string, number>>({});
+  const [teachersByDept, setTeachersByDept] = useState<Record<string, TeacherRecord[]>>({});
   const [hodInputByDept, setHodInputByDept] = useState<Record<string, string>>({});
 
   const loadData = async () => {
@@ -18,11 +19,21 @@ export default function DepartmentManagement() {
       const countEntries = await Promise.all(
         rows.map(async (dept) => {
           const teachers = await teachersApi.byDepartment(dept.id);
-          return [dept.id, (teachers.data ?? []).length] as const;
+          return [dept.id, teachers.data ?? []] as const;
         }),
       );
 
-      setTeacherCountByDept(Object.fromEntries(countEntries));
+      const teacherMap = Object.fromEntries(countEntries);
+      setTeachersByDept(teacherMap);
+      setTeacherCountByDept(
+        Object.fromEntries(Object.entries(teacherMap).map(([deptId, teachers]) => [deptId, teachers.length])),
+      );
+
+      const defaultInputs: Record<string, string> = {};
+      rows.forEach((dept) => {
+        if (dept.hod_id) defaultInputs[dept.id] = dept.hod_id;
+      });
+      setHodInputByDept(defaultInputs);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to load departments');
     }
@@ -77,14 +88,22 @@ export default function DepartmentManagement() {
                   </div>
 
                   <div className="p-6">
-                    <label className="block text-slate-700 mb-2">Assign HOD (User UUID)</label>
+                    <label className="block text-slate-700 mb-2">Assign HOD</label>
                     <div className="flex gap-3">
-                      <input
+                      <select
                         value={hodInputByDept[dept.id] || ''}
                         onChange={(e) => setHodInputByDept((prev) => ({ ...prev, [dept.id]: e.target.value }))}
-                        placeholder="e.g. 0f6fdac9-..."
                         className="flex-1 px-4 py-3 border border-slate-300 rounded-lg"
-                      />
+                      >
+                        <option value="">Select teacher as HOD</option>
+                        {(teachersByDept[dept.id] || [])
+                          .filter((teacher) => teacher.user_id)
+                          .map((teacher) => (
+                            <option key={teacher.id} value={teacher.user_id}>
+                              {teacher.users?.name || teacher.employee_id} ({teacher.employee_id})
+                            </option>
+                          ))}
+                      </select>
                       <button
                         onClick={() => assignHod(dept.id)}
                         className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
@@ -92,7 +111,7 @@ export default function DepartmentManagement() {
                         Assign
                       </button>
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">Use the HOD user's UUID from backend users table.</p>
+                    <p className="text-xs text-slate-500 mt-2">Only teachers linked to a user account can be assigned as HOD.</p>
                   </div>
                 </div>
               ))}

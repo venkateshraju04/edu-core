@@ -1,83 +1,85 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { Star, FileText } from 'lucide-react';
+import { lessonPlansApi, teachersApi, type LessonPlanRecord, type TeacherRecord } from '../services/api';
 
-interface Teacher {
+interface TeacherView {
   id: string;
   name: string;
   subject: string;
   photo: string;
-  attendance: 'Present' | 'Absent';
+  attendance: 'Active' | 'Needs Attention';
   lessonPlan: 'Submitted' | 'Pending';
   rating: number;
+  feedback: string;
+}
+
+function ratingFromPlans(plans: LessonPlanRecord[]): number {
+  if (!plans.length) return 3.5;
+  const approved = plans.filter((p) => p.status === 'approved').length;
+  return Math.round((3 + (approved / plans.length) * 2) * 10) / 10;
+}
+
+function mapTeacher(teacher: TeacherRecord, plans: LessonPlanRecord[]): TeacherView {
+  const approved = plans.filter((p) => p.status === 'approved').length;
+  const pending = plans.filter((p) => p.status === 'pending').length;
+  const latest = plans[0];
+
+  return {
+    id: teacher.id,
+    name: teacher.users?.name || teacher.employee_id,
+    subject: teacher.departments?.name || (teacher.subjects?.[0] || 'General'),
+    photo: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(teacher.users?.name || teacher.id)}`,
+    attendance: pending > approved ? 'Needs Attention' : 'Active',
+    lessonPlan: pending > 0 ? 'Pending' : 'Submitted',
+    rating: ratingFromPlans(plans),
+    feedback: latest
+      ? `Latest lesson topic: ${latest.topic}. Approved plans: ${approved}/${plans.length}.`
+      : 'No lesson plans found yet.',
+  };
 }
 
 export default function TeacherPerformance() {
   const [showFeedback, setShowFeedback] = useState(false);
-  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [selectedTeacher, setSelectedTeacher] = useState<TeacherView | null>(null);
+  const [teachers, setTeachers] = useState<TeacherView[]>([]);
 
-  const teachers: Teacher[] = [
-    {
-      id: 'T001',
-      name: 'Dr. Sarah Mitchell',
-      subject: 'Mathematics',
-      photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
-      attendance: 'Present',
-      lessonPlan: 'Submitted',
-      rating: 4.8
-    },
-    {
-      id: 'T002',
-      name: 'Prof. Michael Chen',
-      subject: 'Physics',
-      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
-      attendance: 'Present',
-      lessonPlan: 'Submitted',
-      rating: 4.5
-    },
-    {
-      id: 'T003',
-      name: 'Ms. Emily Rodriguez',
-      subject: 'English Literature',
-      photo: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&q=80',
-      attendance: 'Present',
-      lessonPlan: 'Pending',
-      rating: 4.9
-    },
-    {
-      id: 'T004',
-      name: 'Mr. James Anderson',
-      subject: 'Chemistry',
-      photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
-      attendance: 'Absent',
-      lessonPlan: 'Submitted',
-      rating: 4.6
-    },
-    {
-      id: 'T005',
-      name: 'Dr. Lisa Thompson',
-      subject: 'Biology',
-      photo: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&q=80',
-      attendance: 'Present',
-      lessonPlan: 'Submitted',
-      rating: 4.7
-    },
-    {
-      id: 'T006',
-      name: 'Prof. David Kim',
-      subject: 'History',
-      photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&q=80',
-      attendance: 'Present',
-      lessonPlan: 'Submitted',
-      rating: 4.4
+  const loadData = async () => {
+    try {
+      const teachersResponse = await teachersApi.list();
+      let plans: LessonPlanRecord[] = [];
+
+      try {
+        const plansResponse = await lessonPlansApi.list('page=1&limit=1000');
+        plans = plansResponse.data ?? [];
+      } catch {
+        plans = [];
+      }
+
+      const rows = (teachersResponse.data ?? []).map((teacher) => {
+        const teacherPlans = plans.filter((plan) => plan.teacher_id === teacher.id);
+        return mapTeacher(teacher, teacherPlans);
+      });
+      setTeachers(rows);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to load teacher performance data');
     }
-  ];
+  };
 
-  const openFeedback = (teacher: Teacher) => {
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const openFeedback = (teacher: TeacherView) => {
     setSelectedTeacher(teacher);
     setShowFeedback(true);
   };
+
+  const averageRating = useMemo(() => {
+    if (!teachers.length) return 0;
+    return Math.round((teachers.reduce((sum, t) => sum + t.rating, 0) / teachers.length) * 10) / 10;
+  }, [teachers]);
 
   return (
     <div className="flex">
@@ -86,9 +88,15 @@ export default function TeacherPerformance() {
         <Header />
         <main className="pt-16 min-h-screen bg-slate-50">
           <div className="p-8">
-            <div className="mb-8">
-              <h1 className="text-slate-800 mb-2">Teacher Performance</h1>
-              <p className="text-slate-600">Monitor and review teacher activities</p>
+            <div className="mb-8 flex items-end justify-between">
+              <div>
+                <h1 className="text-slate-800 mb-2">Teacher Performance</h1>
+                <p className="text-slate-600">Monitor teacher lesson execution and activity health</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 text-right">
+                <p className="text-slate-500 text-sm">Average Rating</p>
+                <p className="text-slate-800">{averageRating}/5.0</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -111,10 +119,10 @@ export default function TeacherPerformance() {
 
                   <div className="space-y-3 mb-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Attendance:</span>
+                      <span className="text-slate-600">Activity:</span>
                       <span className={`px-3 py-1 rounded-full text-sm ${
-                        teacher.attendance === 'Present' 
-                          ? 'bg-green-100 text-green-700' 
+                        teacher.attendance === 'Active'
+                          ? 'bg-green-100 text-green-700'
                           : 'bg-red-100 text-red-700'
                       }`}>
                         {teacher.attendance}
@@ -122,15 +130,15 @@ export default function TeacherPerformance() {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Lesson Plan:</span>
-                      <button className={`px-3 py-1 rounded-full text-sm flex items-center gap-1 ${
+                      <span className="text-slate-600">Lesson Plans:</span>
+                      <span className={`px-3 py-1 rounded-full text-sm flex items-center gap-1 ${
                         teacher.lessonPlan === 'Submitted'
-                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                          : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-orange-100 text-orange-700'
                       }`}>
                         <FileText className="w-3 h-3" />
                         {teacher.lessonPlan}
-                      </button>
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -155,12 +163,11 @@ export default function TeacherPerformance() {
         </main>
       </div>
 
-      {/* Feedback Modal */}
       {showFeedback && selectedTeacher && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
             <div className="p-6 border-b border-slate-200">
-              <h2 className="text-slate-800">Teacher Feedback</h2>
+              <h2 className="text-slate-800">Teacher Activity Insight</h2>
               <p className="text-slate-600 mt-1">{selectedTeacher.name} - {selectedTeacher.subject}</p>
             </div>
 
@@ -169,29 +176,26 @@ export default function TeacherPerformance() {
                 <label className="block text-slate-700 mb-2">Overall Rating</label>
                 <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      className="p-2 hover:bg-slate-100 rounded transition"
-                    >
+                    <div key={star} className="p-2">
                       <Star
                         className={`w-8 h-8 ${
-                          star <= selectedTeacher.rating
+                          star <= Math.round(selectedTeacher.rating)
                             ? 'fill-yellow-400 text-yellow-400'
                             : 'text-slate-300'
                         }`}
                       />
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-2">Feedback Comments</label>
+                <label className="block text-slate-700 mb-2">Feedback Summary</label>
                 <textarea
                   rows={6}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your feedback and observations..."
-                  defaultValue="Excellent teaching methods and student engagement. Consistently submits lesson plans on time."
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-slate-50"
+                  value={selectedTeacher.feedback}
+                  readOnly
                 ></textarea>
               </div>
             </div>
@@ -199,15 +203,9 @@ export default function TeacherPerformance() {
             <div className="p-6 border-t border-slate-200 flex gap-3">
               <button
                 onClick={() => setShowFeedback(false)}
-                className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-lg hover:bg-slate-200 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowFeedback(false)}
                 className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
               >
-                Save Feedback
+                Close
               </button>
             </div>
           </div>

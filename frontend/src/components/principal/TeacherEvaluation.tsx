@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '../Sidebar';
 import Header from '../Header';
 import { Star, X } from 'lucide-react';
+import { lessonPlansApi, teachersApi, type LessonPlanRecord, type TeacherRecord } from '../../services/api';
 
-interface Teacher {
+interface TeacherView {
   id: string;
   name: string;
   subject: string;
@@ -12,73 +13,118 @@ interface Teacher {
   feedback: string;
 }
 
+interface LocalEvaluation {
+  rating: number;
+  feedback: string;
+}
+
+const LOCAL_KEY = 'principal.teacherEvaluations.v1';
+
+function loadLocalEvaluations(): Record<string, LocalEvaluation> {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, LocalEvaluation>;
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalEvaluations(data: Record<string, LocalEvaluation>) {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+}
+
+function scoreFromPlans(plans: LessonPlanRecord[]): number {
+  if (!plans.length) return 3.5;
+  const approved = plans.filter((plan) => plan.status === 'approved').length;
+  const pending = plans.filter((plan) => plan.status === 'pending').length;
+  const rejected = plans.filter((plan) => plan.status === 'rejected').length;
+  const ratio = approved / plans.length;
+  const base = 3 + ratio * 2;
+  const penalty = pending * 0.03 + rejected * 0.08;
+  const score = Math.max(1, Math.min(5, base - penalty));
+  return Math.round(score * 10) / 10;
+}
+
+function toTeacherView(
+  teacher: TeacherRecord,
+  plans: LessonPlanRecord[],
+  local: Record<string, LocalEvaluation>,
+): TeacherView {
+  const localValue = local[teacher.id];
+  const computedRating = scoreFromPlans(plans);
+  const defaultFeedback = plans.length
+    ? `${plans.filter((p) => p.status === 'approved').length}/${plans.length} lesson plans approved.`
+    : 'No lesson plan activity found yet.';
+
+  return {
+    id: teacher.id,
+    name: teacher.users?.name || 'Unknown Teacher',
+    subject: teacher.departments?.name || 'General',
+    photo: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(teacher.users?.name || teacher.id)}`,
+    rating: localValue?.rating || computedRating,
+    feedback: localValue?.feedback || defaultFeedback,
+  };
+}
+
 export default function TeacherEvaluation() {
-  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [selectedTeacher, setSelectedTeacher] = useState<TeacherView | null>(null);
   const [showEvaluationForm, setShowEvaluationForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
+  const [teachers, setTeachers] = useState<TeacherView[]>([]);
 
-  const teachers: Teacher[] = [
-    {
-      id: 'T001',
-      name: 'Dr. Sarah Mitchell',
-      subject: 'Mathematics',
-      photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
-      rating: 4.8,
-      feedback: 'Excellent teaching methods and student engagement. Consistently submits lesson plans on time.'
-    },
-    {
-      id: 'T002',
-      name: 'Prof. Michael Chen',
-      subject: 'Physics',
-      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
-      rating: 4.5,
-      feedback: 'Strong subject knowledge. Good classroom management skills.'
-    },
-    {
-      id: 'T003',
-      name: 'Ms. Emily Rodriguez',
-      subject: 'English Literature',
-      photo: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&q=80',
-      rating: 4.9,
-      feedback: 'Outstanding educator. Creates engaging lesson plans and maintains excellent rapport with students.'
-    },
-    {
-      id: 'T004',
-      name: 'Mr. James Anderson',
-      subject: 'Chemistry',
-      photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
-      rating: 4.6,
-      feedback: 'Organized and methodical approach to teaching. Lab sessions are well-structured.'
-    },
-    {
-      id: 'T005',
-      name: 'Dr. Lisa Thompson',
-      subject: 'Biology',
-      photo: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&q=80',
-      rating: 4.7,
-      feedback: 'Innovative teaching techniques. Regularly updates curriculum with current research.'
-    },
-    {
-      id: 'T006',
-      name: 'Prof. David Kim',
-      subject: 'History',
-      photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&q=80',
-      rating: 4.4,
-      feedback: 'Makes history engaging through storytelling. Could improve on assignment feedback timing.'
-    }
-  ];
-
-  const openEvaluation = (teacher: Teacher) => {
+  const openEvaluation = (teacher: TeacherView) => {
     setSelectedTeacher(teacher);
     setRating(teacher.rating);
     setFeedback(teacher.feedback);
     setShowEvaluationForm(true);
   };
 
+  const loadTeachers = async () => {
+    try {
+      const local = loadLocalEvaluations();
+      const [teachersResponse, plansResponse] = await Promise.all([
+        teachersApi.list(),
+        lessonPlansApi.list('page=1&limit=1000'),
+      ]);
+
+      const teacherRows = teachersResponse.data ?? [];
+      const allPlans = plansResponse.data ?? [];
+
+      const rows = teacherRows.map((teacher) => {
+        const plans = allPlans.filter((plan) => plan.teacher_id === teacher.id);
+        return toTeacherView(teacher, plans, local);
+      });
+
+      setTeachers(rows);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to load teacher evaluation data');
+    }
+  };
+
+  useEffect(() => {
+    loadTeachers();
+  }, []);
+
+  const averageRating = useMemo(() => {
+    if (teachers.length === 0) return 0;
+    return Math.round((teachers.reduce((sum, t) => sum + t.rating, 0) / teachers.length) * 10) / 10;
+  }, [teachers]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Evaluation saved for ${selectedTeacher?.name}`);
+    if (!selectedTeacher) return;
+
+    const local = loadLocalEvaluations();
+    local[selectedTeacher.id] = { rating, feedback };
+    saveLocalEvaluations(local);
+
+    setTeachers((current) =>
+      current.map((teacher) =>
+        teacher.id === selectedTeacher.id ? { ...teacher, rating, feedback } : teacher,
+      ),
+    );
     setShowEvaluationForm(false);
   };
 
@@ -89,9 +135,15 @@ export default function TeacherEvaluation() {
         <Header />
         <main className="pt-16 min-h-screen bg-slate-50">
           <div className="p-8">
-            <div className="mb-8">
-              <h1 className="text-slate-800 mb-2">Teacher Evaluation</h1>
-              <p className="text-slate-600">Review and evaluate teacher performance</p>
+            <div className="mb-8 flex items-end justify-between">
+              <div>
+                <h1 className="text-slate-800 mb-2">Teacher Evaluation</h1>
+                <p className="text-slate-600">Review teacher performance using live activity data</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 text-right">
+                <p className="text-slate-500 text-sm">Average Rating</p>
+                <p className="text-slate-800">{averageRating}/5.0</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -121,7 +173,7 @@ export default function TeacherEvaluation() {
                             <Star
                               key={star}
                               className={`w-4 h-4 ${
-                                star <= teacher.rating
+                                star <= Math.round(teacher.rating)
                                   ? 'fill-yellow-400 text-yellow-400'
                                   : 'text-slate-300'
                               }`}
@@ -147,7 +199,6 @@ export default function TeacherEvaluation() {
         </main>
       </div>
 
-      {/* Evaluation Form Modal */}
       {showEvaluationForm && selectedTeacher && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -167,11 +218,10 @@ export default function TeacherEvaluation() {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-blue-800 text-sm">
-                  This evaluation form is only editable on the Principal's dashboard. Your ratings and feedback help improve teaching quality.
+                  Evaluations are persisted locally in this browser because no principal evaluation write API exists yet.
                 </p>
               </div>
 
-              {/* Star Rating */}
               <div>
                 <label className="block text-slate-700 mb-3">Overall Performance Rating</label>
                 <div className="flex items-center gap-3">
@@ -195,69 +245,15 @@ export default function TeacherEvaluation() {
                 </div>
               </div>
 
-              {/* Evaluation Criteria */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-700 mb-2">Teaching Methodology</label>
-                  <select className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option>Excellent</option>
-                    <option>Good</option>
-                    <option>Average</option>
-                    <option>Needs Improvement</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 mb-2">Student Engagement</label>
-                  <select className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option>Excellent</option>
-                    <option>Good</option>
-                    <option>Average</option>
-                    <option>Needs Improvement</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 mb-2">Classroom Management</label>
-                  <select className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option>Excellent</option>
-                    <option>Good</option>
-                    <option>Average</option>
-                    <option>Needs Improvement</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 mb-2">Professionalism</label>
-                  <select className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option>Excellent</option>
-                    <option>Good</option>
-                    <option>Average</option>
-                    <option>Needs Improvement</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Principal's Feedback */}
               <div>
-                <label className="block text-slate-700 mb-2">Principal&apos;s Feedback</label>
+                <label className="block text-slate-700 mb-2">Principal Feedback</label>
                 <textarea
                   rows={6}
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   required
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Provide detailed feedback on the teacher's performance, strengths, and areas for improvement..."
-                ></textarea>
-              </div>
-
-              {/* Action Items */}
-              <div>
-                <label className="block text-slate-700 mb-2">Action Items / Recommendations</label>
-                <textarea
-                  rows={3}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="List specific action items or recommendations for improvement..."
+                  placeholder="Provide detailed feedback on strengths and areas for improvement..."
                 ></textarea>
               </div>
 

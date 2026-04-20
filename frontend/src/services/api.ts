@@ -83,6 +83,7 @@ export interface StudentRecord {
 
 export interface TeacherRecord {
   id: string;
+  user_id?: string;
   employee_id: string;
   department_id: string;
   subjects: string[];
@@ -97,6 +98,23 @@ export interface TeacherRecord {
   departments?: {
     name?: string;
   } | null;
+}
+
+export interface FeeSummary {
+  totalDue: number;
+  totalPaid: number;
+  outstanding: number;
+  paidCount: number;
+  partialCount: number;
+  unpaidCount: number;
+}
+
+export interface AttendanceSummary {
+  records: Array<{ date: string; is_present: boolean }>;
+  total: number;
+  present: number;
+  absent: number;
+  percentage: number;
 }
 
 export interface DepartmentRecord {
@@ -294,6 +312,7 @@ export const teachersApi = {
 
 export const feesApi = {
   list: (query?: string) => request<FeeRecord[]>(`/fees${query ? `?${query}` : ""}`),
+  summary: () => request<FeeSummary>('/fees/summary'),
   update: (id: string, amountPaid: number, paidDate?: string) =>
     request<FeeRecord>(`/fees/${id}`, {
       method: "PUT",
@@ -385,6 +404,7 @@ export interface MarkRecord {
 
 export const attendanceApi = {
   classByDate: (classId: string, date: string) => request<AttendanceRecord[]>(`/attendance/class/${classId}/date/${date}`),
+  studentSummary: (studentId: string) => request<AttendanceSummary>(`/attendance/student/${studentId}`),
   bulkMark: (payload: { class_id: string; date: string; records: Array<{ student_id: string; is_present: boolean }> }) =>
     request<AttendanceRecord[]>('/attendance/bulk', {
       method: 'POST',

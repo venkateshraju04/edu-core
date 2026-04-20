@@ -1,42 +1,84 @@
+import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '../Sidebar';
 import Header from '../Header';
 import { DollarSign, Users, UserCheck, AlertCircle } from 'lucide-react';
+import { admissionsApi, feesApi, studentsApi, teachersApi } from '../../services/api';
 
 export default function AdminDashboard() {
+  const [loading, setLoading] = useState(true);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalTeachers, setTotalTeachers] = useState(0);
+  const [pendingAdmissions, setPendingAdmissions] = useState(0);
+  const [feesCollected, setFeesCollected] = useState(0);
+  const [unpaidCount, setUnpaidCount] = useState(0);
+  const [recentAdmissions, setRecentAdmissions] = useState<Array<{ text: string; time: string }>>([]);
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      const [studentsResponse, teachersResponse, admissionsResponse, summaryResponse] = await Promise.all([
+        studentsApi.list('page=1&limit=1'),
+        teachersApi.list(),
+        admissionsApi.list('status=pending&page=1&limit=5'),
+        feesApi.summary(),
+      ]);
+
+      setTotalStudents(studentsResponse.meta?.total ?? (studentsResponse.data?.length || 0));
+      setTotalTeachers(teachersResponse.meta?.total ?? (teachersResponse.data?.length || 0));
+      setPendingAdmissions(admissionsResponse.meta?.total ?? (admissionsResponse.data?.length || 0));
+      setFeesCollected(Number(summaryResponse.data?.totalPaid || 0));
+      setUnpaidCount(Number(summaryResponse.data?.unpaidCount || 0));
+
+      const updates = (admissionsResponse.data ?? []).map((admission) => ({
+        text: `${admission.first_name} ${admission.last_name} applied for Grade ${admission.grade_applying}`,
+        time: new Date(admission.date_of_birth).toLocaleDateString(),
+      }));
+      setRecentAdmissions(updates);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
   const stats = [
     {
       title: 'Total Students',
-      value: '1,200',
+      value: loading ? '...' : totalStudents.toLocaleString(),
       icon: <Users className="w-8 h-8" />,
       color: 'bg-blue-500'
     },
     {
       title: 'Fees Collected',
-      value: '$50,000',
+      value: loading ? '...' : `$${feesCollected.toLocaleString()}`,
       icon: <DollarSign className="w-8 h-8" />,
       color: 'bg-green-500'
     },
     {
-      title: 'Teachers Present',
-      value: '45/48',
+      title: 'Active Teachers',
+      value: loading ? '...' : totalTeachers.toString(),
       icon: <UserCheck className="w-8 h-8" />,
       color: 'bg-purple-500'
     },
     {
       title: 'Pending Alerts',
-      value: '5 Due',
+      value: loading ? '...' : `${pendingAdmissions + unpaidCount} Due`,
       icon: <AlertCircle className="w-8 h-8" />,
       color: 'bg-red-500'
     }
   ];
 
-  const recentUpdates = [
-    { text: 'John Doe paid fees for Quarter 2', time: '10 mins ago' },
-    { text: 'New admission: Sarah Johnson (Grade 9)', time: '1 hour ago' },
-    { text: 'Teacher Meeting scheduled for Dec 15', time: '2 hours ago' },
-    { text: 'Report cards generated for Grade 10', time: '3 hours ago' },
-    { text: 'Library books updated in system', time: '5 hours ago' }
-  ];
+  const recentUpdates = useMemo(() => {
+    if (recentAdmissions.length > 0) return recentAdmissions;
+    return [
+      { text: 'No new pending admissions right now', time: 'Today' },
+      { text: `${unpaidCount} students currently have unpaid fees`, time: 'Live summary' },
+    ];
+  }, [recentAdmissions, unpaidCount]);
 
   return (
     <div className="flex">
