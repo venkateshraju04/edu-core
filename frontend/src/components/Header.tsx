@@ -77,7 +77,7 @@ export default function Header() {
   const profileData = {
     name: user?.name ?? 'User',
     email: user?.email ?? '',
-    phone: 'Not provided',
+    phone: user?.email ? 'Available in profile' : 'Not provided',
     role: role?.toUpperCase() || 'USER',
     department: role === 'hod' || role === 'teacher' ? 'Assigned Department' : 'Administration',
     joinDate: user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A',
@@ -235,7 +235,7 @@ export default function Header() {
                 </div>
                 <div>
                   <p className="text-slate-600 text-sm">Department</p>
-                  <p className="text-slate-800">{profileData.department}</p>
+                  <p className="text-slate-800">{role === 'admin' ? 'Administration' : profileData.department}</p>
                 </div>
                 <div>
                   <p className="text-slate-600 text-sm">Member Since</p>

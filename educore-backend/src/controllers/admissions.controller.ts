@@ -60,9 +60,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 export async function approve(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
-    const { class_id } = req.body;
-
-    if (!class_id) throw new AppError(400, 'class_id is required to approve an admission');
+    const requestedClassId = req.body?.class_id as string | undefined;
 
     // Fetch admission
     const { data: admission, error: fetchErr } = await supabaseAdmin
@@ -74,11 +72,58 @@ export async function approve(req: Request, res: Response, next: NextFunction): 
     if (fetchErr || !admission) throw new AppError(404, 'Admission not found');
     if (admission.status !== 'pending') throw new AppError(400, 'Admission is already processed');
 
+    let classId = requestedClassId;
+    if (!classId) {
+      const { data: gradeClasses, error: classErr } = await supabaseAdmin
+        .from('classes')
+        .select('id, section')
+        .eq('grade', admission.grade_applying)
+        .order('section', { ascending: true })
+        .limit(1);
+
+      if (classErr) {
+        throw new AppError(500, classErr.message);
+      }
+
+      if (gradeClasses && gradeClasses.length > 0) {
+        classId = gradeClasses[0].id;
+      } else {
+        const section = 'A';
+        const { data: createdClass, error: createClassErr } = await supabaseAdmin
+          .from('classes')
+          .insert({
+            grade: admission.grade_applying,
+            section,
+            name: `Grade ${admission.grade_applying}-${section}`,
+          })
+          .select('id')
+          .single();
+
+        if (createClassErr || !createdClass) {
+          // If another request created the same class concurrently, re-read and continue.
+          const { data: fallbackClasses, error: fallbackErr } = await supabaseAdmin
+            .from('classes')
+            .select('id')
+            .eq('grade', admission.grade_applying)
+            .order('section', { ascending: true })
+            .limit(1);
+
+          if (fallbackErr || !fallbackClasses || fallbackClasses.length === 0) {
+            throw new AppError(500, createClassErr?.message || 'Unable to resolve class for admission');
+          }
+
+          classId = fallbackClasses[0].id;
+        } else {
+          classId = createdClass.id;
+        }
+      }
+    }
+
     // Determine next roll number for the class
     const { data: lastStudent } = await supabaseAdmin
       .from('students')
       .select('roll_number')
-      .eq('class_id', class_id)
+      .eq('class_id', classId)
       .order('roll_number', { ascending: false })
       .limit(1)
       .single();
@@ -92,7 +137,7 @@ export async function approve(req: Request, res: Response, next: NextFunction): 
       last_name:       admission.last_name,
       date_of_birth:   admission.date_of_birth,
       gender:          admission.gender,
-      class_id,
+      class_id: classId,
       parent_name:     admission.parent_name,
       parent_email:    admission.parent_email,
       parent_phone:    admission.parent_phone,

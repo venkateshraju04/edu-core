@@ -24,6 +24,7 @@ import DepartmentManagement from "./components/principal/DepartmentManagement";
 import TeacherAssignment from "./components/hod/TeacherAssignment";
 import StudentManagement from "./components/admin/StudentManagement";
 import StudentMarking from "./components/teacher/StudentMarking";
+import Chatbot from "./components/Chatbot";
 import { authApi, clearAuthToken, getAuthToken, type AuthUser } from "./services/api";
 
 type UserRole =
@@ -309,6 +310,7 @@ function App() {
             }
           />
         </Routes>
+        <Chatbot />
       </Router>
     </AuthContext.Provider>
   );

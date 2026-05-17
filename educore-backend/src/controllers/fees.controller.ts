@@ -12,7 +12,7 @@ export async function list(req: Request, res: Response, next: NextFunction): Pro
 
     let query = supabaseAdmin
       .from('fees')
-      .select('*, students(first_name, last_name, roll_number, class_id, classes(name))', { count: 'exact' })
+      .select('*, students(first_name, last_name, roll_number, student_code, class_id, classes(name))', { count: 'exact' })
       .order('due_date', { ascending: true })
       .range(offset, offset + limit - 1);
 
@@ -125,7 +125,7 @@ export async function getReceipt(req: Request, res: Response, next: NextFunction
 
     const { data, error } = await supabaseAdmin
       .from('fees')
-      .select('*, students(first_name, last_name), users!fees_updated_by_fkey(name)')
+      .select('*, students(first_name, last_name, student_code), users!fees_updated_by_fkey(name)')
       .eq('id', id)
       .single();
 

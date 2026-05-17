@@ -69,6 +69,7 @@ export interface BackendNotification {
 
 export interface StudentRecord {
   id: string;
+  student_code?: string;
   roll_number: number;
   first_name: string;
   last_name: string;
@@ -141,6 +142,7 @@ export interface FeeRecord {
   students?: {
     first_name?: string;
     last_name?: string;
+    student_code?: string;
     roll_number?: number;
     class_id?: string;
     classes?: {
@@ -328,10 +330,10 @@ export const admissionsApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  approve: (id: string, classId: string) =>
+  approve: (id: string, classId?: string) =>
     request<AdmissionRecord>(`/admissions/${id}/approve`, {
       method: "PATCH",
-      body: JSON.stringify({ class_id: classId }),
+      body: JSON.stringify(classId ? { class_id: classId } : {}),
     }),
   reject: (id: string) =>
     request<AdmissionRecord>(`/admissions/${id}/reject`, {
@@ -424,5 +426,18 @@ export const marksApi = {
     request<MarkRecord>(`/marks/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
+    }),
+};
+
+export interface ChatResponse {
+  reply: string;
+  intent: string;
+}
+
+export const chatApi = {
+  send: (message: string) =>
+    request<ChatResponse>('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
     }),
 };

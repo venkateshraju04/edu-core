@@ -65,7 +65,7 @@ INSERT INTO classes (id, grade, section, name) VALUES
 INSERT INTO teachers (id, user_id, employee_id, department_id, subjects, qualification, joining_date, phone) VALUES
   ('00000000-0000-0000-0003-000000000001',
    '00000000-0000-0000-0001-000000000003',
-   'EMP001',
+  'EMP-MAT-25-0001',
    '00000000-0000-0000-0000-000000000001',
    ARRAY['Mathematics'],
    'M.Sc Mathematics, B.Ed',
@@ -74,7 +74,7 @@ INSERT INTO teachers (id, user_id, employee_id, department_id, subjects, qualifi
 
   ('00000000-0000-0000-0003-000000000002',
    '00000000-0000-0000-0001-000000000004',
-   'EMP002',
+    'EMP-MAT-25-0002',
    '00000000-0000-0000-0000-000000000001',
    ARRAY['Mathematics'],
    'B.Sc Mathematics, B.Ed',
@@ -102,6 +102,14 @@ INSERT INTO fees (student_id, academic_year, term, amount_due, amount_paid, due_
   ('00000000-0000-0000-0004-000000000003', '2025-26', 1, 15000.00,     0.00, '2025-06-30', 'unpaid'),
   ('00000000-0000-0000-0004-000000000004', '2025-26', 1, 15000.00, 15000.00, '2025-06-30', 'paid'),
   ('00000000-0000-0000-0004-000000000005', '2025-26', 1, 15000.00,     0.00, '2025-05-31', 'unpaid');
+
+-- Add a term 2 fee for each student so the admin fees table has multiple rows.
+INSERT INTO fees (student_id, academic_year, term, amount_due, amount_paid, due_date, status) VALUES
+  ('00000000-0000-0000-0004-000000000001', '2025-26', 2, 12000.00,  6000.00, '2025-10-31', 'partial'),
+  ('00000000-0000-0000-0004-000000000002', '2025-26', 2, 12000.00,     0.00, '2025-10-31', 'unpaid'),
+  ('00000000-0000-0000-0004-000000000003', '2025-26', 2, 12000.00, 12000.00, '2025-10-31', 'paid'),
+  ('00000000-0000-0000-0004-000000000004', '2025-26', 2, 12000.00,  3000.00, '2025-10-31', 'partial'),
+  ('00000000-0000-0000-0004-000000000005', '2025-26', 2, 12000.00,     0.00, '2025-10-31', 'unpaid');
 
 -- ─────────────────────────────────────────────
 -- SAMPLE ADMISSION (pending)

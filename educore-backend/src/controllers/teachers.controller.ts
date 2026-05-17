@@ -12,7 +12,7 @@ const createTeacherSchema = z.object({
   password:      z.string().min(8),
   department_id: z.string().uuid(),
   // Teacher profile fields
-  employee_id:   z.string().min(1).max(20),
+  employee_id:   z.string().max(24).optional().or(z.literal('')),
   subjects:      z.array(z.string()).min(1),
   qualification: z.string().optional(),
   joining_date:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -108,7 +108,8 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       .from('teachers')
       .insert({
         user_id:       user.id,
-        employee_id:   body.employee_id,
+        // When omitted, DB trigger generates a structured employee ID.
+        employee_id:   body.employee_id?.trim() || undefined,
         department_id: body.department_id,
         subjects:      body.subjects,
         qualification: body.qualification,

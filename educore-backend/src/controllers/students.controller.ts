@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../config/db';
 import { createStudentSchema, updateStudentSchema } from '../validations/student.schema';
 import { AppError } from '../middleware/errorHandler';
 import { getPagination, buildMeta } from '../utils/pagination';
+import { getNextRollNumber } from '../services/students.service';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -68,11 +69,24 @@ export async function create(req: Request, res: Response, next: NextFunction): P
   try {
     const body = createStudentSchema.parse(req.body);
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('students')
       .insert(body)
       .select()
       .single();
+
+    if (error && error.message.includes('students_class_roll_unique')) {
+      // If caller provided an already-used roll number, normalize to next available.
+      const nextRoll = await getNextRollNumber(body.class_id);
+      const retry = await supabaseAdmin
+        .from('students')
+        .insert({ ...body, roll_number: nextRoll })
+        .select()
+        .single();
+
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw new AppError(400, error.message);
 

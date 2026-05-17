@@ -2,7 +2,28 @@ import Sidebar from '../Sidebar';
 import Header from '../Header';
 import { Download, Settings as SettingsIcon } from 'lucide-react';
 
+const trainingResources = [
+  {
+    title: 'Administrator User Guide',
+    href: '/README.md',
+  },
+  {
+    title: 'Platform Architecture Notes',
+    href: '/SYSTEM_ARCHITECTURE.md',
+  },
+  {
+    title: 'Frontend Guidelines',
+    href: '/frontend/src/guidelines/Guidelines.md',
+  },
+  {
+    title: 'Backend Setup Notes',
+    href: '/educore-backend/README.md',
+  },
+];
+
 export default function Settings() {
+  const appVersion = (import.meta as any).env?.VITE_APP_VERSION || 'development build';
+
   return (
     <div className="flex">
       <Sidebar />
@@ -32,11 +53,11 @@ export default function Settings() {
                   </div>
                   <div>
                     <p className="text-slate-600 text-sm mb-1">Version</p>
-                    <p className="text-slate-800">v2.5.1</p>
+                    <p className="text-slate-800">{appVersion}</p>
                   </div>
                   <div>
                     <p className="text-slate-600 text-sm mb-1">Last Updated</p>
-                    <p className="text-slate-800">December 1, 2024</p>
+                    <p className="text-slate-800">Deployment managed</p>
                   </div>
                   <div>
                     <p className="text-slate-600 text-sm mb-1">License Type</p>
@@ -49,23 +70,20 @@ export default function Settings() {
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h2 className="text-slate-800 mb-4">Training & Documentation</h2>
                 <div className="space-y-3">
-                  {[
-                    'Administrator User Guide',
-                    'Teacher Portal Manual',
-                    'Principal Dashboard Guide',
-                    'Fee Management Tutorial',
-                    'Student Records Management'
-                  ].map((item, index) => (
-                    <button
-                      key={index}
+                  {trainingResources.map((item) => (
+                    <a
+                      key={item.title}
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer"
                       className="w-full flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition text-left"
                     >
                       <div className="flex items-center gap-3">
                         <Download className="w-5 h-5 text-blue-600" />
-                        <span className="text-slate-800">{item}</span>
+                        <span className="text-slate-800">{item.title}</span>
                       </div>
                       <span className="text-slate-500 text-sm">PDF</span>
-                    </button>
+                    </a>
                   ))}
                 </div>
               </div>

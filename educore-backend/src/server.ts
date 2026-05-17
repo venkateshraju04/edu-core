@@ -20,6 +20,7 @@ import departmentRoutes from './routes/departments.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import marksRoutes from './routes/marks.routes';
 import notificationsRoutes from './routes/notifications.routes';
+import chatRoutes from './routes/chat.routes';
 
 const app = express();
 
@@ -59,6 +60,7 @@ app.use('/api/departments',    departmentRoutes);
 app.use('/api/attendance',     attendanceRoutes);
 app.use('/api/marks',          marksRoutes);
 app.use('/api/notifications',  notificationsRoutes);
+app.use('/api/chat',           chatRoutes);
 
 
 

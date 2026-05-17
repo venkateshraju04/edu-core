@@ -2,20 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '../Sidebar';
 import Header from '../Header';
 import { X as XIcon, Plus, UserPlus } from 'lucide-react';
-import { admissionsApi, studentsApi, type AdmissionRecord, type StudentRecord } from '../../services/api';
-
-function classLabel(student: StudentRecord): string {
-  if (student.classes?.name) return student.classes.name;
-  if (student.classes?.grade && student.classes?.section) return `Grade ${student.classes.grade}-${student.classes.section}`;
-  if (student.classes?.grade) return `Grade ${student.classes.grade}`;
-  return 'Unassigned';
-}
+import { admissionsApi, type AdmissionRecord } from '../../services/api';
 
 export default function Admissions() {
   const [showNewAdmissionForm, setShowNewAdmissionForm] = useState(false);
-  const [admissions, setAdmissions] = useState<AdmissionRecord[]>([]);
-  const [students, setStudents] = useState<StudentRecord[]>([]);
-  const [classSelectionByAdmission, setClassSelectionByAdmission] = useState<Record<string, string>>({});
+  const [admissions, setAdmissions] = useState([] as AdmissionRecord[]);
   const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
@@ -34,12 +25,8 @@ export default function Admissions() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [admissionsResponse, studentsResponse] = await Promise.all([
-        admissionsApi.list('page=1&limit=200'),
-        studentsApi.list('page=1&limit=200'),
-      ]);
+      const admissionsResponse = await admissionsApi.list('page=1&limit=200');
       setAdmissions(admissionsResponse.data ?? []);
-      setStudents(studentsResponse.data ?? []);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to load admissions');
     } finally {
@@ -51,13 +38,9 @@ export default function Admissions() {
     loadData();
   }, []);
 
-  const classOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    students.forEach((student) => map.set(student.class_id, classLabel(student)));
-    return Array.from(map.entries());
-  }, [students]);
+  const gradeOptions = useMemo(() => Array.from({ length: 10 }, (_, index) => String(index + 1)), []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
 
     try {
@@ -94,7 +77,7 @@ export default function Admissions() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: any) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -103,13 +86,7 @@ export default function Admissions() {
 
   const handleApprove = async (admissionId: string) => {
     try {
-      const classId = classSelectionByAdmission[admissionId] || classOptions[0]?.[0];
-      if (!classId) {
-        alert('No class is available for assignment.');
-        return;
-      }
-
-      await admissionsApi.approve(admissionId, classId);
+      await admissionsApi.approve(admissionId);
       await loadData();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to approve admission');
@@ -160,7 +137,7 @@ export default function Admissions() {
                 <div className="space-y-4">
                   {loading ? (
                     <p className="text-slate-500 text-center py-8">Loading admissions...</p>
-                  ) : admissions.map((admission) => (
+                  ) : admissions.map((admission: AdmissionRecord) => (
                     <div key={admission.id} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
                       <div className="flex items-start justify-between mb-3">
                         <div>
@@ -184,15 +161,6 @@ export default function Admissions() {
                       </div>
                       {admission.status === 'pending' && (
                         <div className="flex gap-2 items-center">
-                          <select
-                            value={classSelectionByAdmission[admission.id] || classOptions[0]?.[0] || ''}
-                            onChange={(e) => setClassSelectionByAdmission((prev) => ({ ...prev, [admission.id]: e.target.value }))}
-                            className="px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                          >
-                            {classOptions.map(([id, label]) => (
-                              <option key={id} value={id}>{label}</option>
-                            ))}
-                          </select>
                           <button
                             onClick={() => handleApprove(admission.id)}
                             className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition text-sm"
@@ -278,9 +246,9 @@ export default function Admissions() {
                     <label className="block text-xs text-slate-600 mb-1">Grade</label>
                     <select name="grade" value={formData.grade} onChange={handleChange} required className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white">
                       <option value="">Select Grade</option>
-                      <option value="8">Grade 8</option>
-                      <option value="9">Grade 9</option>
-                      <option value="10">Grade 10</option>
+                      {gradeOptions.map((grade) => (
+                        <option key={grade} value={grade}>Grade {grade}</option>
+                      ))}
                     </select>
                   </div>
 

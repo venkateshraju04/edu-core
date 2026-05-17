@@ -7,6 +7,7 @@ import { feesApi, type FeeRecord } from '../../services/api';
 interface UiFee {
   id: string;
   studentId: string;
+  studentCode: string;
   name: string;
   className: string;
   amountDue: number;
@@ -18,10 +19,12 @@ interface UiFee {
 function mapFeeRow(row: FeeRecord): UiFee {
   const status = row.status === 'paid' ? 'Paid' : row.status === 'partial' ? 'Partial' : 'Unpaid';
   const name = `${row.students?.first_name || ''} ${row.students?.last_name || ''}`.trim() || row.student_id;
+  const studentCode = row.students?.student_code || row.student_id.slice(0, 8);
 
   return {
     id: row.id,
     studentId: row.student_id,
+    studentCode,
     name,
     className: row.students?.classes?.name || row.students?.class_id || 'Unknown',
     amountDue: Number(row.amount_due) - Number(row.amount_paid),
@@ -108,6 +111,7 @@ export default function FeesManagement() {
 
   const allClasses = ['All Classes', ...Array.from(new Set(fees.map((s) => s.className)))];
   const allStatuses = ['All Status', 'Paid', 'Partial', 'Unpaid'];
+  const visibleFees = filteredStudents;
 
   return (
     <div className="flex">
@@ -170,9 +174,9 @@ export default function FeesManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStudents.map((student) => (
+                    {visibleFees.length > 0 ? visibleFees.map((student) => (
                       <tr key={student.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                        <td className="px-6 py-4 text-slate-800">{student.studentId.slice(0, 8)}</td>
+                        <td className="px-6 py-4 text-slate-800">{student.studentCode}</td>
                         <td className="px-6 py-4 text-slate-800">{student.name}</td>
                         <td className="px-6 py-4 text-slate-600">{student.className}</td>
                         <td className="px-6 py-4 text-slate-800">${student.amountDue}</td>
@@ -192,7 +196,13 @@ export default function FeesManagement() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr>
+                        <td className="px-6 py-8 text-center text-slate-500" colSpan={6}>
+                          No fee records found yet. Add fee rows for more students to populate this table.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

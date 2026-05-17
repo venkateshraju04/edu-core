@@ -4,11 +4,6 @@ import Header from '../Header';
 import { UserPlus } from 'lucide-react';
 import { admissionsApi, studentsApi, type AdmissionRecord, type StudentRecord } from '../../services/api';
 
-interface ClassOption {
-  id: string;
-  label: string;
-}
-
 function classLabel(student: StudentRecord): string {
   const name = student.classes?.name;
   if (name) return name;
@@ -25,7 +20,6 @@ export default function StudentManagement() {
   const [admissions, setAdmissions] = useState<AdmissionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState('All Classes');
-  const [classSelectionByAdmission, setClassSelectionByAdmission] = useState<Record<string, string>>({});
 
   const loadData = async () => {
     try {
@@ -48,29 +42,13 @@ export default function StudentManagement() {
     loadData();
   }, []);
 
-  const classOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    students.forEach((student) => {
-      map.set(student.class_id, classLabel(student));
-    });
-
-    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
-  }, [students]);
-
   const classes = ['All Classes', ...Array.from(new Set(students.map((s) => classLabel(s))))];
 
   const handleApproveAdmission = async (admission: AdmissionRecord) => {
-    const selectedClassId = classSelectionByAdmission[admission.id] || classOptions[0]?.id;
-
-    if (!selectedClassId) {
-      alert('No classes available yet. Add at least one class/student record in backend first.');
-      return;
-    }
-
     try {
-      await admissionsApi.approve(admission.id, selectedClassId);
+      await admissionsApi.approve(admission.id);
       await loadData();
-      alert(`${admission.first_name} ${admission.last_name} has been added to the selected class.`);
+      alert(`${admission.first_name} ${admission.last_name} has been approved and added based on the applied grade.`);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to approve admission');
     }
@@ -126,25 +104,11 @@ export default function StudentManagement() {
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <select
-                              value={classSelectionByAdmission[admission.id] || classOptions[0]?.id || ''}
-                              onChange={(e) => setClassSelectionByAdmission((prev) => ({
-                                ...prev,
-                                [admission.id]: e.target.value,
-                              }))}
-                              className="px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                            >
-                              {classOptions.map((option: ClassOption) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
                             <button
                               onClick={() => handleApproveAdmission(admission)}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                             >
-                              Add to Class
+                              Approve
                             </button>
                           </div>
                         </div>
@@ -190,7 +154,7 @@ export default function StudentManagement() {
                       <tbody>
                         {filteredStudents.map((student) => (
                           <tr key={student.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                            <td className="px-6 py-4 text-slate-800">{student.id.slice(0, 8)}</td>
+                            <td className="px-6 py-4 text-slate-800">{student.student_code || student.id.slice(0, 8)}</td>
                             <td className="px-6 py-4 text-slate-800">{student.first_name} {student.last_name}</td>
                             <td className="px-6 py-4 text-slate-600">{student.roll_number}</td>
                             <td className="px-6 py-4 text-slate-600">{classLabel(student)}</td>

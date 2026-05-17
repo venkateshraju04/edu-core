@@ -229,8 +229,8 @@ export default function TeacherManagement() {
               {!editingTeacher && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-slate-700 mb-2">Employee ID</label>
-                    <input type="text" required value={formData.employeeId} onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })} className="w-full px-4 py-3 border border-slate-300 rounded-lg" />
+                    <label className="block text-slate-700 mb-2">Employee ID (Optional)</label>
+                    <input type="text" value={formData.employeeId} onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })} placeholder="Leave blank to auto-generate" className="w-full px-4 py-3 border border-slate-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-slate-700 mb-2">Temporary Password</label>
